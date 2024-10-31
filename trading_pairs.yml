@@ -1,0 +1,4 @@
+trading_pairs:
+  - symbol: "LINKUSDT"
+    interval: "1h"
+    start_date: "1 Sep, 2024"
