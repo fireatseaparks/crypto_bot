@@ -1,2 +1,6 @@
+.idea
+.venv
 config.yml
 logs
+__pycache__
+sample_data/*.json
