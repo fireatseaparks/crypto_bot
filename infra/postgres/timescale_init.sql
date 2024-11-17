@@ -34,8 +34,13 @@ CREATE TABLE IF NOT EXISTS candlesticks (
 );
 
 -- Convert the "candlesticks" table into a TimescaleDB Hypertable
-SELECT * FROM create_hypertable('candlesticks', by_range('timestamp'));
-SELECT * FROM add_dimension('candlesticks', by_hash('trading_pair_id', 8));
+SELECT create_hypertable(
+    'candlesticks',                            -- Table to be converted
+    'timestamp',                               -- Time column for partitioning
+    partitioning_column => 'trading_pair_id',  -- Additional partitioning column
+    number_partitions => 8,                    -- Specify the number of partitions
+    if_not_exists => TRUE                      -- Ensure hypertable creation only if it doesn't exist
+);
 
 -- Create indexes to improve query performance
 CREATE INDEX IF NOT EXISTS idx_candlesticks_pair_time ON candlesticks (trading_pair_id, timestamp);
