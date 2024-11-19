@@ -1,4 +1,4 @@
 trading_pairs:
   - symbol: "LINKUSDT"
-    interval: "15m"
+    interval: "1m"
     start_date: "1 May, 2017"

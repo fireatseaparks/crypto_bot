@@ -1,0 +1,13 @@
+binance:
+  api_key: "YOUR_API_KEY"
+  api_secret: "YOUR_API_SECRET"
+
+log:
+  path: "/PATH/TO/PROJECT/FOLDER/logs"
+
+postgres:
+  host: localhost
+  port: "5432"
+  dbname: opa
+  user: user
+  password: password

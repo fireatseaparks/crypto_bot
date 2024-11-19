@@ -54,73 +54,33 @@ To run this script, make sure to create `config.yml` and `trading_pairs.yml` in 
 Then execute:
 
 """
-
-from pathlib import Path
 from binance.client import Client
 from binance.helpers import date_to_milliseconds
+from pathlib import Path
+
+from src.config.config_loader import load_config
+from src.data_download.binance_data_loader import BinanceDataLoader
+from src.db.database_handler import connect_to_database
+from src.db.postgres_operations import PostgresOperations
+from src.config.logger_config import setup_logger
+
+
 from typing import List, Dict
 
-from src.helper.logger_config import setup_logger
-from src.config.config_loader import load_config
-from src.helper.data_processor import load_last_close_time_from_json, save_to_json
-from src.data_download.api_handler import get_klines
-
-
-def load_candlestick_data(client: Client, symbol: str, interval: str, start_date: str) -> List[List]:
-    """
-    Loads candlestick data from Binance, starting from either the last recorded close time
-    or a specified start date, and returns it as a list of OHLCV data lists.
-
-    Parameters
-    ----------
-    client : binance.Client
-        Binance client instance for API interaction.
-    symbol : str
-        Name of the trading pair, e.g., "BNBBTC".
-    interval : str
-        Candlestick interval, e.g., "1m" for 1 minute.
-    start_date : str
-        Date from which to start fetching data if no previous data is recorded.
-
-    Returns
-    -------
-    List[List]
-        List of OHLCV data, where each inner list contains the candlestick data for a single interval.
-
-    Notes
-    -----
-    - If the last close time is available in the existing JSON data, the function will start loading
-      data from the next timestamp. Otherwise, it will start from the given `start_date`.
-    - The function logs the start and end of the data loading process.
-
-    Example
-    -------
-    ```python
-    klines = load_candlestick_data(client, "BNBBTC", "1h", "1 Jan, 2021")
-    ```
-    """
-    last_close_time = load_last_close_time_from_json(symbol, interval)
-    start_ts = last_close_time + 1 if last_close_time else date_to_milliseconds(start_date)
-
-    if last_close_time:
-        logger.info(f"Trying to load new candlestick data from Binance trading pair '{symbol}' with a '{interval}' interval.")
-    else:
-        logger.info(f"Trying to initial load candlestick data from Binance trading pair '{symbol}' with a '{interval}' interval. Starting from {start_date}")
-
-    klines = get_klines(client, symbol, interval, start_ts)
-    logger.info(f"Loaded candlestick data from Binance for '{symbol}' with interval '{interval}' starting at {start_ts}.")
-    return klines
-
-def process_trading_pairs(pairs: List[Dict]) -> None:
+def process_trading_pairs(pairs: List[Dict], client, connection) -> None:
     """
     Processes each trading pair from the configuration, checks the Binance system status,
-    retrieves candlestick data, and saves it to JSON.
+    retrieves candlestick data, and saves it to the database.
 
     Parameters
     ----------
     pairs : List[Dict]
         List of trading pair configurations with each dictionary containing 'symbol',
         'interval', and 'start_date' keys.
+    client : binance.Client
+        Binance client instance for API interaction.
+    connection : psycopg2 connection
+        Database connection object for inserting data.
 
     Returns
     -------
@@ -130,30 +90,59 @@ def process_trading_pairs(pairs: List[Dict]) -> None:
     -----
     - The function checks the Binance system status before each data retrieval. If Binance
       is unavailable, it skips the current trading pair.
-    - If the data retrieval is successful, it saves the data to a JSON file and logs the process.
+    - Ensures the trading pair and source exist in the database before data processing.
+    - Saves the candlestick data directly to the database.
 
     Example
     -------
     ```python
     pairs = [{'symbol': 'BNBBTC', 'interval': '1h', 'start_date': '1 Jan, 2021'}]
-    process_trading_pairs(pairs)
+    process_trading_pairs(pairs, client, connection)
     ```
     """
+    bh = BinanceDataLoader(logger)
+    pg = PostgresOperations(logger)
+    source_name = "Binance"
+
     for pair in pairs:
         symbol = pair['symbol']
         interval = pair['interval']
         start_date = pair['start_date']
 
         try:
+            # Check Binance system status
             status = client.get_system_status()
-            if status.get('status') == 0:
-                klines = load_candlestick_data(client, symbol, interval, start_date)
-                save_to_json(klines, symbol, interval)
+            if status.get('status') != 0:
+                logger.error(f"Binance is not available. Skipping data load for '{symbol}' with interval '{interval}'.")
+                continue
+
+            # Ensure trading pair exists in the database
+            trading_pair_id = pg.get_or_create_trading_pair_id(connection, symbol, source_name)
+
+            # Get the last close time from the database or use the start_date
+            last_close_time = pg.get_last_close_time(connection, trading_pair_id)
+            if last_close_time:
+                start_ts = last_close_time + 1
+            else:
+                start_ts = date_to_milliseconds(start_date)  # Convert start_date to milliseconds
+
+            # Load candlestick data from Binance
+            df_klines = bh.load_candlestick_data(client, symbol, interval, start_ts)
+
+            df_klines["trading_pair_id"] = trading_pair_id
+            df_klines.insert(0, 'trading_pair_id', df_klines.pop('trading_pair_id'))  # Move 'timestamp' to the first column
+
+            if not df_klines.empty:
+                # Save data to the database using PostgreSQL COPY
+                pg.copy_import_candlestick_data(connection, df_klines)
+
                 logger.info(f"Data for '{symbol}' with interval '{interval}' has been successfully processed.")
             else:
-                logger.error(f"Binance is not available. Skipping data load for '{symbol}' with interval '{interval}'.")
+                logger.warning(f"No new data available for '{symbol}' with interval '{interval}'. Skipping.")
+
         except Exception as e:
-            logger.error(f"Error occurred while trying to connect to Binance. ERROR: {e}")
+            logger.error(f"Error occurred while processing '{symbol}' with interval '{interval}'. ERROR: {e}")
+
 
 if __name__ == "__main__":
     conf_path = Path(__file__).resolve().parent / "config.yml"
@@ -170,4 +159,6 @@ if __name__ == "__main__":
 
     pairs = load_config(pairs_conf_path)
 
-    process_trading_pairs(pairs['trading_pairs'])
+    conn = connect_to_database(config['postgres'])
+    process_trading_pairs(pairs['trading_pairs'], client=client, connection=conn)
+    conn.close()
