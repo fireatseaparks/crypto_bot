@@ -117,7 +117,7 @@ def process_trading_pairs(pairs: List[Dict], client, connection) -> None:
                 continue
 
             # Ensure trading pair exists in the database
-            trading_pair_id = pg.get_or_create_trading_pair_id(connection, symbol, source_name)
+            trading_pair_id = pg.get_or_create_trading_pair(connection, symbol, interval, source_name)
 
             # Get the last close time from the database or use the start_date
             last_close_time = pg.get_last_close_time(connection, trading_pair_id)

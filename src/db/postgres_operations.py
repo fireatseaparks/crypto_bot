@@ -44,33 +44,62 @@ class PostgresOperations:
             self.logger.error(f"Error copying data to PostgreSQL: {e}")
             connection.rollback()
 
-    def get_source_id(self, connection, source_name):
+    def get_or_create_source(self, connection, source_name: str, source_type: str = "exchange",
+                             description: str = None) -> int:
         """
         Fetches the source_id for a given source name.
+        If the source does not exist, it will be created.
 
-        Args:
-            connection: psycopg2 database connection object.
-            source_name: Name of the source (e.g., 'Binance').
+        Parameters
+        ----------
+        connection : psycopg2 connection
+            Database connection object.
+        source_name : str
+            Name of the source (e.g., 'Binance').
+        source_type : str, optional
+            Type of the source (default is 'exchange').
+        description : str, optional
+            Additional information about the source.
+
+        Returns
+        -------
+        int
+            The source ID of the fetched or newly created source.
         """
-        query = "SELECT id FROM sources WHERE name = %s"
         try:
+            # Check if the source exists
+            query = "SELECT id FROM sources WHERE name = %s"
             with connection.cursor() as cursor:
                 cursor.execute(query, (source_name,))
                 result = cursor.fetchone()
-                if result:
-                    return result[0]
-                else:
-                    self.logger.warning(f"Source {source_name} not found.")
-                    return None
-        except Exception as e:
-            self.logger.error(f"Error fetching source ID: {e}")
-            return None
 
-    def get_or_create_trading_pair_id(self, connection, symbol: str, source_name: str,
-                                      source_type: str = "exchange") -> int:
+                if result:
+                    source_id = result[0]
+                    self.logger.info(f"Source '{source_name}' already exists with ID {source_id}.")
+                    return source_id
+
+                # Create the source if it does not exist
+                cursor.execute(
+                    """
+                    INSERT INTO sources (name, type, description)
+                    VALUES (%s, %s, %s)
+                    RETURNING id
+                    """,
+                    (source_name, source_type, description),
+                )
+                source_id = cursor.fetchone()[0]
+                connection.commit()
+                self.logger.info(f"Created new source '{source_name}' with ID {source_id}.")
+                return source_id
+        except Exception as e:
+            self.logger.error(f"Error getting or creating source '{source_name}': {e}")
+            connection.rollback()
+            raise
+
+    def get_or_create_trading_pair(self, connection, symbol: str, interval: str, source_name: str) -> int:
         """
-        Fetches the trading_pair_id for a given trading pair symbol and source.
-        If the trading pair or source does not exist, it will be created.
+        Fetches the trading_pair_id for a given trading pair symbol, source, and interval.
+        If the trading pair does not exist, it will be created.
 
         Parameters
         ----------
@@ -78,6 +107,8 @@ class PostgresOperations:
             Database connection object.
         symbol : str
             Trading pair symbol (e.g., 'BTCUSDT').
+        interval : str
+            Candlestick interval (e.g., '1m', '1h').
         source_name : str
             Name of the source (e.g., 'Binance').
         source_type : str, optional
@@ -86,51 +117,41 @@ class PostgresOperations:
         Returns
         -------
         int
-            The trading_pair_id for the given symbol and source.
+            The trading_pair_id for the given symbol, source, and interval.
         """
         try:
-            # Check if the source exists
             with connection.cursor() as cursor:
-                cursor.execute("SELECT id FROM sources WHERE name = %s", (source_name,))
-                source_result = cursor.fetchone()
+                source_id = self.get_or_create_source(connection, source_name)
 
-                if source_result:
-                    source_id = source_result[0]
-                else:
-                    # Insert the source if it doesn't exist
-                    cursor.execute(
-                        "INSERT INTO sources (name, type) VALUES (%s, %s) RETURNING id",
-                        (source_name, source_type),
-                    )
-                    source_id = cursor.fetchone()[0]
-                    self.logger.info(f"Created new source '{source_name}' with ID {source_id}.")
-
-                # Check if the trading pair exists for the source
+                # Check if the trading pair with the interval exists for the source
                 cursor.execute(
-                    "SELECT id FROM trading_pairs WHERE symbol = %s AND source_id = %s",
-                    (symbol, source_id),
+                    """
+                    SELECT id 
+                    FROM trading_pairs 
+                    WHERE symbol = %s AND interval = %s AND source_id = %s
+                    """,
+                    (symbol, interval, source_id),
                 )
                 trading_pair_result = cursor.fetchone()
-
                 if trading_pair_result:
                     trading_pair_id = trading_pair_result[0]
                 else:
                     # Insert the trading pair if it doesn't exist
                     cursor.execute(
                         """
-                        INSERT INTO trading_pairs (symbol, source_id, type)
-                        VALUES (%s, %s, %s) RETURNING id
+                        INSERT INTO trading_pairs (symbol, interval, source_id, type)
+                        VALUES (%s, %s, %s, %s) RETURNING id
                         """,
-                        (symbol, source_id, "crypto"),
+                        (symbol, interval, source_id, "crypto"),
                     )
                     trading_pair_id = cursor.fetchone()[0]
-                    self.logger.info(f"Created new trading pair '{symbol}' with ID {trading_pair_id}.")
+                    self.logger.info(
+                        f"Created new trading pair '{symbol}' with interval '{interval}' and ID {trading_pair_id}.")
 
                 connection.commit()
                 return trading_pair_id
-
         except Exception as e:
-            self.logger.error(f"Error fetching or creating trading pair '{symbol}': {e}")
+            self.logger.error(f"Error fetching or creating trading pair '{symbol}' with interval '{interval}': {e}")
             connection.rollback()
             raise
 

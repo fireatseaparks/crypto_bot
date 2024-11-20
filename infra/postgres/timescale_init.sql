@@ -14,8 +14,9 @@ CREATE TABLE IF NOT EXISTS trading_pairs (
     id SERIAL PRIMARY KEY,                                      -- Unique ID for the trading pair
     source_id INT REFERENCES sources(id) ON DELETE CASCADE,     -- Reference to the source table
     symbol VARCHAR(20) NOT NULL,                                -- Trading pair symbol, e.g., "BTC/USD", "ETH/USD"
+    interval VARCHAR(5) NOT NULL,                               -- Interval of each candlestick i.e 1 Minute (1m), 4 hours (4h)
     type VARCHAR(20) NOT NULL,                                  -- Type of data, e.g., "crypto", "fiat", "macro"
-    UNIQUE (source_id, symbol)                                  -- Ensure uniqueness per source and trading pair
+    UNIQUE (source_id, symbol, interval)                        -- Ensure uniqueness per source and trading pair
 );
 
 -- Create the "candlesticks" table (fact table)
