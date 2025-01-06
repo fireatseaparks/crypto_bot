@@ -9,6 +9,7 @@ services:
     volumes:
       - ./configs/config.yml:/app/config.yml:ro
       - ./configs/trading_pairs.yml:/app/trading_pairs.yml:ro
+      - ./logs/crypto_bot.log:/app/logs/crypto_bot.log:rw
     networks:
       - crypto_bot_network
 
