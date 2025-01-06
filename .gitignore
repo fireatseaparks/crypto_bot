@@ -1,5 +1,5 @@
 .idea
-.venv
+.venv*
 configs/config.yml
 logs
 __pycache__
