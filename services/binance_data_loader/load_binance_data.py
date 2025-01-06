@@ -145,8 +145,8 @@ def process_trading_pairs(pairs: List[Dict], client, connection) -> None:
 
 
 if __name__ == "__main__":
-    conf_path = Path(__file__).resolve().parent / "config.yml"
-    pairs_conf_path = Path(__file__).resolve().parent / "trading_pairs.yml"
+    conf_path = Path(__file__).resolve().parent / "/app/config.yml"
+    pairs_conf_path = Path(__file__).resolve().parent / "/app/trading_pairs.yml"
 
     config = load_config(conf_path)
 

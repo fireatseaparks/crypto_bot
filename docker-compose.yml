@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  binance_data_loader:
+    build:
+      context: ./services/binance_data_loader
+      dockerfile: Dockerfile
+    container_name: binance_data_loader
+    volumes:
+      - ./configs/config.yml:/app/config.yml:ro
+      - ./configs/trading_pairs.yml:/app/trading_pairs.yml:ro
+    networks:
+      - crypto_bot_network
+
+networks:
+  crypto_bot_network:
+    external: true
+    name: shared_crypto_bot_network

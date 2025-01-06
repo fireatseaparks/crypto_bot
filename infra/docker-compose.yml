@@ -20,7 +20,7 @@ services:
       - primary_data:/home/postgres/pgdata/data
       - ./postgres/timescale_init.sql:/docker-entrypoint-initdb.d/timescale_init.sql
     networks:
-      - timescale-network
+      - crypto_bot_network
 
   timescaledb-replica:
     image: timescale/timescaledb-ha:pg16
@@ -44,13 +44,14 @@ services:
     volumes:
       - replica_data:/home/postgres/pgdata/data
     networks:
-      - timescale-network
+      - crypto_bot_network
 
 volumes:
   primary_data:
   replica_data:
 
 networks:
-  timescale-network:
-    driver: bridge
+  crypto_bot_network:
+    external: true
+    name: shared_crypto_bot_network
 

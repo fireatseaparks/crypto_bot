@@ -35,8 +35,6 @@ from binance import Client
 from decimal import Decimal
 from typing import List
 
-from src.helper.json_processor import load_last_close_time_from_json
-
 
 class BinanceDataLoader:
     def __init__(self, logger):

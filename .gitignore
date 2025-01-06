@@ -1,6 +1,6 @@
 .idea
 .venv
-config.yml
+configs/config.yml
 logs
 __pycache__
 sample_data/*.json

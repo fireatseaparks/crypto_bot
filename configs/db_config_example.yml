@@ -6,7 +6,7 @@ log:
   path: "/PATH/TO/PROJECT/FOLDER/logs"
 
 postgres:
-  host: localhost
+  host: timescaledb-primary
   port: "5432"
   dbname: opa
   user: user
