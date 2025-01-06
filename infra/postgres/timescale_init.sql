@@ -57,10 +57,10 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 -- Insert example data into the "trading_pairs" table (optional)
-INSERT INTO trading_pairs (source_id, symbol, type)
+INSERT INTO trading_pairs (source_id, symbol, interval, type)
 VALUES
-    ((SELECT id FROM sources WHERE name = 'Binance'), 'LINK/USDT', 'crypto'),
-    ((SELECT id FROM sources WHERE name = 'Binance'), 'LINK/BTC', 'crypto'),
-    ((SELECT id FROM sources WHERE name = 'Federal Reserve'), 'M2', 'macro')
+    ((SELECT id FROM sources WHERE name = 'Binance'), 'LINK/USDT', '1m', 'crypto'),
+    ((SELECT id FROM sources WHERE name = 'Binance'), 'LINK/BTC', '1m', 'crypto'),
+    ((SELECT id FROM sources WHERE name = 'Federal Reserve'), 'M2', '1m', 'macro')
 ON CONFLICT DO NOTHING;
 
