@@ -17,7 +17,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - primary_data:/var/lib/postgresql/data
+      - primary_data:/home/postgres/pgdata/data
       - ./postgres/timescale_init.sql:/docker-entrypoint-initdb.d/timescale_init.sql
     networks:
       - timescale-network
@@ -42,7 +42,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - replica_data:/var/lib/postgresql/data
+      - replica_data:/home/postgres/pgdata/data
     networks:
       - timescale-network
 
